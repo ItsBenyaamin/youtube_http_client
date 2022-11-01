@@ -2,15 +2,15 @@ use crate::app::error::Error;
 
 
 #[derive(Debug, PartialEq)]
-pub struct UrlParser {
+pub struct ParsedUrl {
     pub scheme: String,
     pub host: String,
     pub path: String
 }
 
-impl UrlParser {
+impl ParsedUrl {
 
-    pub fn from(url: &str) -> Result<UrlParser, Error> {
+    pub fn from(url: &str) -> Result<ParsedUrl, Error> {
         let addr = if url.starts_with("http") || url.starts_with("https") {
             url.to_owned()
         }else {
@@ -18,10 +18,21 @@ impl UrlParser {
         };
 
         let mut split = addr.split("://");
-        let scheme = split.next().unwrap().to_string();
-        split = split.next().unwrap().split("/");
 
-        let host = split.next().unwrap().to_string();
+        let scheme = match split.next() {
+            Some(v) => v.to_string(),
+            None => return Err(Error::UrlParsingError),
+        };
+
+        split = match split.next() {
+            Some(v) => v.split("/"),
+            None => return Err(Error::UrlParsingError),
+        };
+
+        let host = match split.next() {
+            Some(v) => v.to_string(),
+            None => return Err(Error::UrlParsingError),
+        };
 
         let mut path = String::new();
         loop {
@@ -40,7 +51,7 @@ impl UrlParser {
 
 
         Ok(
-            UrlParser { scheme, host, path }
+            ParsedUrl { scheme, host, path }
         )
     }
 
@@ -48,14 +59,14 @@ impl UrlParser {
 
 #[cfg(test)]
 mod test {
-    use super::UrlParser;
+    use super::ParsedUrl;
 
     #[test]
     fn test1_works() {
         let url = "https://benyaamin.com";
-        let result = UrlParser::from(url).unwrap();
+        let result = ParsedUrl::from(url).unwrap();
 
-        let expected = UrlParser {
+        let expected = ParsedUrl {
             scheme: "https".to_owned(),
             host: "benyaamin.com".to_owned(),
             path: "/".to_owned()
@@ -67,9 +78,9 @@ mod test {
     #[test]
     fn test2_works() {
         let url = "benyaamin.com";
-        let result = UrlParser::from(url).unwrap();
+        let result = ParsedUrl::from(url).unwrap();
 
-        let expected = UrlParser {
+        let expected = ParsedUrl {
             scheme: "http".to_owned(),
             host: "benyaamin.com".to_owned(),
             path: "/".to_owned()
@@ -81,11 +92,25 @@ mod test {
     #[test]
     fn test3_not_works() {
         let url = "benyaamin.com";
-        let result = UrlParser::from(url).unwrap();
+        let result = ParsedUrl::from(url).unwrap();
 
-        let expected = UrlParser {
+        let expected = ParsedUrl {
             scheme: "".to_owned(),
             host: "benyaamin.com".to_owned(),
+            path: "/".to_owned()
+        };
+
+        assert_ne!(result, expected)
+    }
+
+    #[test]
+    fn test4_works() {
+        let url = "168.119.172.64";
+        let result = ParsedUrl::from(url).unwrap();
+
+        let expected = ParsedUrl {
+            scheme: "".to_owned(),
+            host: "168.119.172.64".to_owned(),
             path: "/".to_owned()
         };
 
