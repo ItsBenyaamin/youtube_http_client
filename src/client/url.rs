@@ -5,12 +5,15 @@ use crate::app::error::Error;
 pub struct ParsedUrl {
     pub scheme: String,
     pub host: String,
+    pub port: usize,
     pub path: String
 }
 
 impl ParsedUrl {
 
     pub fn from(url: &str) -> Result<ParsedUrl, Error> {
+        let mut port: usize = 0;
+
         let addr = if url.starts_with("http") || url.starts_with("https") {
             url.to_owned()
         }else {
@@ -20,7 +23,14 @@ impl ParsedUrl {
         let mut split = addr.split("://");
 
         let scheme = match split.next() {
-            Some(v) => v.to_string(),
+            Some(v) => {
+                if v == "https" {
+                    port = 443;
+                }else {
+                    port = 80;
+                }
+                v.to_string()
+            },
             None => return Err(Error::UrlParsingError),
         };
 
@@ -30,7 +40,15 @@ impl ParsedUrl {
         };
 
         let host = match split.next() {
-            Some(v) => v.to_string(),
+            Some(v) => {
+                if v.contains(":") {
+                    let mut host_split = v.split(":");
+                    let host = host_split.next().unwrap();
+                    port = host_split.next().unwrap().parse().unwrap();
+                    host.to_string();
+                }
+                v.to_string()
+            },
             None => return Err(Error::UrlParsingError),
         };
 
@@ -51,7 +69,7 @@ impl ParsedUrl {
 
 
         Ok(
-            ParsedUrl { scheme, host, path }
+            ParsedUrl { scheme, host, port, path }
         )
     }
 
@@ -69,6 +87,7 @@ mod test {
         let expected = ParsedUrl {
             scheme: "https".to_owned(),
             host: "benyaamin.com".to_owned(),
+            port: 443,
             path: "/".to_owned()
         };
 
@@ -83,6 +102,7 @@ mod test {
         let expected = ParsedUrl {
             scheme: "http".to_owned(),
             host: "benyaamin.com".to_owned(),
+            port: 80,
             path: "/".to_owned()
         };
 
@@ -97,6 +117,7 @@ mod test {
         let expected = ParsedUrl {
             scheme: "".to_owned(),
             host: "benyaamin.com".to_owned(),
+            port: 80,
             path: "/".to_owned()
         };
 
@@ -111,6 +132,22 @@ mod test {
         let expected = ParsedUrl {
             scheme: "".to_owned(),
             host: "168.119.172.64".to_owned(),
+            port: 80,
+            path: "/".to_owned()
+        };
+
+        assert_ne!(result, expected)
+    }
+
+    #[test]
+    fn test5_works() {
+        let url = "168.119.172.64:5481";
+        let result = ParsedUrl::from(url).unwrap();
+
+        let expected = ParsedUrl {
+            scheme: "".to_owned(),
+            host: "168.119.172.64".to_owned(),
+            port: 5481,
             path: "/".to_owned()
         };
 

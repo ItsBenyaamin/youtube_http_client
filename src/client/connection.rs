@@ -1,8 +1,8 @@
-use tokio::{net::TcpStream, io::{AsyncWriteExt, AsyncReadExt}};
+use tokio::{net::TcpStream, io::AsyncWriteExt};
 
 use crate::app::error::Error;
 
-use super::url::ParsedUrl;
+use super::{url::ParsedUrl, response::Response};
 
 
 pub struct Connection {
@@ -20,19 +20,24 @@ impl Connection {
         )
     }
 
-    pub async fn head_request(&mut self) -> Result<(), Error> {
+    pub async fn head_request(&mut self) -> Result<Response, Error> {
         self.stream.write_all(format!("HEAD {} HTTP/1.1\r\n", self.parsed_url.path).as_bytes()).await?;
         self.stream.write_all(format!("HOST: {}\r\n", self.parsed_url.host).as_bytes()).await?;
         
         self.stream.write_all(b"Connection: Close\r\n").await?;
         self.stream.write_all(b"\r\n\r\n").await?;
 
-        let mut buff = String::new();
-        self.stream.read_to_string(&mut buff).await?;
+        Ok(Response::new(self).await?)
+    }
 
-        println!("response:\n{}", buff);
+    pub async fn get_request(&mut self) -> Result<Response, Error> {
+        self.stream.write_all(format!("GET {} HTTP/1.1\r\n", self.parsed_url.path).as_bytes()).await?;
+        self.stream.write_all(format!("HOST: {}\r\n", self.parsed_url.host).as_bytes()).await?;
+        
+        self.stream.write_all(b"Connection: Close\r\n").await?;
+        self.stream.write_all(b"\r\n\r\n").await?;
 
-        Ok(())
+        Ok(Response::new(self).await?)
     }
 
 }
