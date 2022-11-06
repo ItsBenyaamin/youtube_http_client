@@ -45,9 +45,10 @@ impl ParsedUrl {
                     let mut host_split = v.split(":");
                     let host = host_split.next().unwrap();
                     port = host_split.next().unwrap().parse().unwrap();
-                    host.to_string();
+                    host.to_string()
+                }else {
+                    v.to_string()
                 }
-                v.to_string()
             },
             None => return Err(Error::UrlParsingError),
         };
