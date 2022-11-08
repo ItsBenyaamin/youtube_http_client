@@ -6,12 +6,14 @@ pub struct ParsedUrl {
     pub scheme: String,
     pub host: String,
     pub port: usize,
-    pub path: String
+    pub path: String,
+    pub file: Option<String>
 }
 
 impl ParsedUrl {
 
     pub fn from(url: &str) -> Result<ParsedUrl, Error> {
+        let mut file: Option<String> = None;
         let mut port: usize = 0;
 
         let addr = if url.starts_with("http") || url.starts_with("https") {
@@ -56,9 +58,13 @@ impl ParsedUrl {
         let mut path = String::new();
         loop {
             match split.next() {
-                Some(v) => path.push_str(
-                    format!("/{}", v).as_str()
-                ),
+                Some(v) => {
+                    path.push_str(format!("/{}", v).as_str());
+
+                    if v.contains('.') {
+                        file = Some(String::from(v));
+                    }
+                },
                 None => {
                     if path.is_empty() {
                         path.push('/');
@@ -70,7 +76,7 @@ impl ParsedUrl {
 
 
         Ok(
-            ParsedUrl { scheme, host, port, path }
+            ParsedUrl { scheme, host, port, path, file }
         )
     }
 
@@ -89,7 +95,8 @@ mod test {
             scheme: "https".to_owned(),
             host: "benyaamin.com".to_owned(),
             port: 443,
-            path: "/".to_owned()
+            path: "/".to_owned(),
+            file: None
         };
 
         assert_eq!(result, expected)
@@ -104,7 +111,8 @@ mod test {
             scheme: "http".to_owned(),
             host: "benyaamin.com".to_owned(),
             port: 80,
-            path: "/".to_owned()
+            path: "/".to_owned(),
+            file: None
         };
 
         assert_eq!(result, expected)
@@ -119,7 +127,8 @@ mod test {
             scheme: "".to_owned(),
             host: "benyaamin.com".to_owned(),
             port: 80,
-            path: "/".to_owned()
+            path: "/".to_owned(),
+            file: None
         };
 
         assert_ne!(result, expected)
@@ -131,13 +140,14 @@ mod test {
         let result = ParsedUrl::from(url).unwrap();
 
         let expected = ParsedUrl {
-            scheme: "".to_owned(),
+            scheme: "http".to_owned(),
             host: "168.119.172.64".to_owned(),
             port: 80,
-            path: "/".to_owned()
+            path: "/".to_owned(),
+            file: None
         };
 
-        assert_ne!(result, expected)
+        assert_eq!(result, expected)
     }
 
     #[test]
@@ -146,13 +156,30 @@ mod test {
         let result = ParsedUrl::from(url).unwrap();
 
         let expected = ParsedUrl {
-            scheme: "".to_owned(),
+            scheme: "http".to_owned(),
             host: "168.119.172.64".to_owned(),
             port: 5481,
-            path: "/".to_owned()
+            path: "/".to_owned(),
+            file: None
         };
 
-        assert_ne!(result, expected)
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn test6_works() {
+        let url = "168.119.172.64/Documents.rar";
+        let result = ParsedUrl::from(url).unwrap();
+
+        let expected = ParsedUrl {
+            scheme: "http".to_owned(),
+            host: "168.119.172.64".to_owned(),
+            port: 80,
+            path: "/Documents.rar".to_owned(),
+            file: Some("Documents.rar".to_string())
+        };
+
+        assert_eq!(result, expected)
     }
 
 }
