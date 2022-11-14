@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 use tokio::{io::AsyncReadExt, net::TcpStream};
 
 use crate::app::error::Error;
@@ -9,7 +9,8 @@ pub struct Response {
     pub status_code: usize,
     pub status_name: String,
     pub headers: HashMap<String, String>,
-    pub body: Option<Vec<u8>>
+    pub body: Option<Vec<u8>>,
+    pub range: Option<Range<usize>>
 }
 
 impl Response {
@@ -79,7 +80,7 @@ impl Response {
         }
 
         Ok(
-            Response { version, status_code, status_name, headers, body }
+            Response { version, status_code, status_name, headers, body, range: None }
         )
     }
 

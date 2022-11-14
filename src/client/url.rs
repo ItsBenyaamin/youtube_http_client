@@ -1,7 +1,7 @@
 use crate::app::error::Error;
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ParsedUrl {
     pub scheme: String,
     pub host: String,
