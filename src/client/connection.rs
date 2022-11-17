@@ -4,7 +4,7 @@ use rand::{thread_rng, Rng};
 use tokio::{net::TcpStream, io::{AsyncWriteExt, AsyncSeekExt}, fs::OpenOptions, sync::Semaphore};
 
 use crate::app::error::Error;
-use super::{url::ParsedUrl, response::Response, method::Method, request::{self, Request}};
+use super::{url::ParsedUrl, response::Response, method::Method, request::Request};
 
 
 static SEM: Semaphore = Semaphore::const_new(0);
@@ -29,7 +29,13 @@ impl Connection {
             format!("{}:{}", self.parsed_url.host, self.parsed_url.port)
         ).await?;
 
-        stream.write_all(format!("{} {} HTTP/1.1\r\n", request.get_method(), self.parsed_url.path).as_bytes()).await?;
+        let path = if request.get_query_strings().is_empty() {
+            self.parsed_url.path.to_string()
+        }else {
+            format!("{}?{}",self.parsed_url.path, request.get_query_strings())
+        };
+
+        stream.write_all(format!("{} {} HTTP/1.1\r\n", request.get_method(), path).as_bytes()).await?;
         stream.write_all(format!("HOST: {}\r\n", self.parsed_url.host).as_bytes()).await?;
         
         for header in request.get_headers() {
@@ -38,6 +44,10 @@ impl Connection {
             ).await?;
         }
 
+        stream.write_all(
+            format!("Content-Length: {}\r\n", request.get_content_length()).as_bytes()
+        ).await?;
+
         if let Some(range) = request.get_range() {
             stream.write_all(
                 format!("Range: bytes={}-{}\r\n", range.start, range.end).as_bytes()
@@ -45,6 +55,12 @@ impl Connection {
         }
         
         stream.write_all(b"Connection: Close\r\n").await?;
+        stream.write_all(b"\r\n").await?;
+
+        if let Some(body) = request.get_body() {
+            stream.write_all(body.as_slice()).await?;
+        }
+
         stream.write_all(b"\r\n\r\n").await?;
 
         Ok(Response::new(&mut stream).await?)
