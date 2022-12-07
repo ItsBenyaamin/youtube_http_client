@@ -62,7 +62,11 @@ impl ParsedUrl {
                     path.push_str(format!("/{}", v).as_str());
 
                     if v.contains('.') {
-                        file = Some(String::from(v));
+                        file = if v.contains("?") {
+                            Some(String::from(v.split("?").next().unwrap()))
+                        }else {
+                            Some(String::from(v))
+                        }
                     }
                 },
                 None => {

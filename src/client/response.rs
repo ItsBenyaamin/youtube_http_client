@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Range};
 use tokio::{io::AsyncReadExt, net::TcpStream};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::app::error::Error;
 
@@ -15,7 +16,8 @@ pub struct Response {
 
 impl Response {
 
-    pub async fn new(stream: &mut TcpStream) -> Result<Response, Error> {
+    pub async fn new<T>(stream: &mut T) -> Result<Response, Error>
+            where T: AsyncRead, T: AsyncWrite, T: Unpin {
         let mut buff: Vec<u8> = vec![];
         let mut headers: HashMap<String, String> = HashMap::new();
         let mut body: Option<Vec<u8>> = None;
