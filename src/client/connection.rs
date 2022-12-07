@@ -2,6 +2,9 @@ use std::{path::PathBuf, sync::{mpsc::{Sender, Receiver}, Arc}};
 
 use rand::{thread_rng, Rng};
 use tokio::{net::TcpStream, io::{AsyncWriteExt, AsyncSeekExt}, fs::OpenOptions, sync::Semaphore};
+use tokio_rustls::rustls::{ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName};
+use tokio_rustls::TlsConnector;
+use tokio_rustls::webpki::DnsNameRef;
 
 use crate::app::error::Error;
 use super::{url::ParsedUrl, response::Response, method::Method, request::Request};
@@ -11,23 +14,49 @@ static SEM: Semaphore = Semaphore::const_new(0);
 
 #[derive(Clone)]
 pub struct Connection {
-    pub parsed_url: ParsedUrl
+    pub parsed_url: ParsedUrl,
+    pub config: TlsConnector,
+    pub dns_name: ServerName
 }
 
 impl Connection {
     
     pub async fn new(url: &str) -> Result<Connection, Error> {
         let parsed_url = ParsedUrl::from(url)?;
-        
+        let mut root_cert_store = RootCertStore::empty();
+        root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
+            |ta| {
+                OwnedTrustAnchor::from_subject_spki_name_constraints(
+                    ta.subject,
+                    ta.spki,
+                    ta.name_constraints,
+                )
+            },
+        ));
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_cert_store)
+            .with_no_client_auth();
+        let config = TlsConnector::from(Arc::new(config));
+        let dns_name = ServerName::try_from(parsed_url.host.as_str()).unwrap();
         Ok(
-            Connection { parsed_url }
+            Connection { parsed_url, config, dns_name }
         )
+    }
+
+    pub async fn handle_redirect(&mut self, new_url: &str) -> Result<(), Error> {
+        let new_connection = Self::new(new_url).await?;
+        self.parsed_url = new_connection.parsed_url;
+        self.config = new_connection.config;
+        self.dns_name = new_connection.dns_name;
+        Ok(())
     }
 
     pub async fn request(&self, request: Request) -> Result<Response, Error> {
         let mut stream = TcpStream::connect(
             format!("{}:{}", self.parsed_url.host, self.parsed_url.port)
         ).await?;
+        let mut stream = self.config.connect(self.dns_name.clone(), stream).await?;
 
         let path = if request.get_query_strings().is_empty() {
             self.parsed_url.path.to_string()
@@ -66,9 +95,22 @@ impl Connection {
         Ok(Response::new(&mut stream).await?)
     }
 
-    pub async fn download(&self, path: &PathBuf) -> Result<(), Error> {
+    pub async fn download(&mut self, path: &PathBuf) -> Result<(), Error> {
         let head_request = Request::new().set_method(Method::HEAD);
-        let head_response = self.request(head_request).await?;
+        let mut head_response = self.request(head_request.clone()).await?;
+
+        if head_response.status_code == 302 {
+            match head_response.headers.get("Location") {
+                Some(v) => {
+                    self.handle_redirect(v.trim()).await?;
+                    head_response = self.request(head_request).await?;
+                }
+                None => {
+                    panic!("There is no `Location` key in headers for follow.")
+                }
+            }
+        }
+
         let mut file_path = PathBuf::from(path.to_str().unwrap());
         let mut file_name = String::new();
 

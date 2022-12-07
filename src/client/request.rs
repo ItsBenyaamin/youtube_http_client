@@ -4,6 +4,7 @@ use super::method::Method;
 
 static BOUNDARY: &str = "X_HTTPCLIENT_BOUNDARY";
 
+#[derive(Clone)]
 pub struct Request {
     method: Method,
     headers: HashMap<String, String>,

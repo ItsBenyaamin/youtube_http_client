@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-
+#[derive(Clone)]
 pub enum Method {
     GET,
     POST,
