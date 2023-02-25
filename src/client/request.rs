@@ -126,10 +126,9 @@ impl Request {
      * 
      * value
      * --X_HTTPCLIENT_BOUNDARY
-     * * --X_HTTPCLIENT_BOUNDARY
-     * Content-Disposition: form-data; name="name"
+     * Content-Disposition: form-data; name="other_name"
      * 
-     * value
+     * other value
      * --X_HTTPCLIENT_BOUNDARY--
      */
 
